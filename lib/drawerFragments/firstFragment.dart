@@ -243,7 +243,21 @@ class Detail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
     return new Scaffold(
+      appBar: new AppBar(
+        // here we display the title corresponding to the fragment
+        // you can instead choose to have a static title
+          title: new Text('Detalles del producto'),
+          actions: <Widget> [
+            FlatButton(
+                child: Text('SAVE', style: theme.textTheme.body1.copyWith(color: Colors.white)),
+                onPressed: () {
+                  Navigator.pop(context, 'save');
+                }
+            )
+          ]
+      ),
       body: new ListView(
         children: <Widget>[
           new Container(
@@ -259,7 +273,7 @@ class Detail extends StatelessWidget {
                   ),
                 ),
               )),
-          new BagianNama(
+          new FormWidget(
             nama: nama,
           ),
           new BagianIcon(),
@@ -270,46 +284,64 @@ class Detail extends StatelessWidget {
   }
 }
 
-class BagianNama extends StatelessWidget {
-  BagianNama({this.nama});
+class FormWidget extends StatelessWidget {
+  FormWidget({this.nama});
   final String nama;
 
   @override
   Widget build(BuildContext context) {
-    return new Container(
-      padding: new EdgeInsets.all(10.0),
-      child: new Row(
-        children: <Widget>[
-          new Expanded(
-            child: new Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                new Text(
-                  nama,
-                  style: new TextStyle(fontSize: 20.0, color: Colors.blue),
-                ),
-                new Text(
-                  "$nama\@gmail.com",
-                  style: new TextStyle(fontSize: 17.0, color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-          new Row(
+    final ThemeData theme = Theme.of(context);
+    return Form(
+        onWillPop: () {},
+        child: Column(
             children: <Widget>[
-              new Icon(
-                Icons.star,
-                size: 30.0,
-                color: Colors.red,
+              Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  alignment: Alignment.bottomLeft,
+                  child: TextField(
+                      decoration: const InputDecoration(
+                          labelText: 'Event name',
+                          filled: true
+                      ),
+                      style: theme.textTheme.headline,
+                      onChanged: (String value) {
+                        // TODO: cambiar nombre del toolbar
+                        /*setState(() {
+                          _hasName = value.isNotEmpty;
+                          if (_hasName) {
+                            _eventName = value;
+                          }
+                        });*/
+                      }
+                  )
               ),
-              new Text(
-                "12",
-                style: new TextStyle(fontSize: 18.0),
-              )
-            ],
-          )
-        ],
-      ),
+              Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  alignment: Alignment.bottomLeft,
+                  child: TextField(
+                      decoration: const InputDecoration(
+                          labelText: 'Location',
+                          hintText: 'Where is the event?',
+                          filled: true
+                      ),
+                      // TODO para ver si cambio un valor
+                      /*onChanged: (String value) {
+                        setState(() {
+                          _hasLocation = value.isNotEmpty;
+                        });
+                      }*/
+                  )
+              ),
+            ]
+                .map<Widget>((Widget child) {
+              return Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  height: 96.0,
+                  child: child
+              );
+            })
+                .toList()
+        )
     );
   }
 }

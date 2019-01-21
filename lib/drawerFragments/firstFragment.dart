@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:fluteryl/common/db/databaseHelper.dart';
+import 'package:fluteryl/common/picture/image_picker_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:fluteryl/navigationDrawer/navigationDrawer.dart';
 import 'package:fluteryl/productos/modelos/producto.dart';
 import 'package:flutter/scheduler.dart' show timeDilation;
+import 'package:fluteryl/productos/detail/detail.dart';
 
 class FirstFragment extends StatefulWidget {
   final HomePageState homePageState;
@@ -17,44 +21,61 @@ class FirstFragment extends StatefulWidget {
   }
 }
 
-class FirstFragmentState extends State<FirstFragment> {
+class FirstFragmentState extends State<FirstFragment>{
+  var db = new DatabaseHelper();
   final HomePageState homePageState;
   List<Producto> productos = [];
   List<int> deleteElements = [];
   int goDetalleId = -1;
+  bool isLoading = true;
 
   FirstFragmentState(this.homePageState) : super();
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
     timeDilation = 3.0; // 1.0 is normal animation speed.
     // TODO: implement build
     return
       new Scaffold(
         floatingActionButton: new FloatingActionButton(
-          onPressed: () {},
-          backgroundColor: Colors.red,
+          onPressed: () async {
+            final Response result = await Navigator.of(context).push(new MaterialPageRoute(
+              builder: (BuildContext context)
+              => new Detail(new Producto(idproductos: null, nombre: '', image: 'assets/images/demou.jpg')),
+            ));
+            if (result.action == action.SAVE) {
+              this.productos.add(result.producto);
+            }
+          },
+          backgroundColor: theme.primaryColor,
           //if you set mini to true then it will make your floating button small
           mini: false,
-          child: new Icon(Icons.timer),
+          child: new Icon(Icons.add),
         ),
-        body: new FutureBuilder<List<Producto>>(
-          future: getData(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) print(snapshot.error);
+        body: !isLoading
+            ? createCard()
+            : Center(child: CircularProgressIndicator())
+      );
+  }
 
-            return snapshot.hasData
-                ? createCard()
-                : Center(child: CircularProgressIndicator());
-          },
-        ));
+  @override
+  initState() {
+    super.initState();
+    getData().then((snapshot) {
+      print('initState initState initState');
+      setState(() => this.isLoading  = false);
+    });
   }
 
   Future<List<Producto>> getData() async {
-    for (var i = 1; i < 101; i++) {
-      this.productos.add(new Producto(id: i, descripcion: 'Producto $i'));
-    }
-    const oneSecond = Duration(seconds: 5);
+    this.productos = [];
+    List productos = await this.db.getAll(db.tableProductos);
+    productos.forEach((product) {
+      var pro = Producto.fromMap(product);
+      this.productos.add(pro);
+    });
+    const oneSecond = Duration(milliseconds: 1);
     final response = Future.delayed(oneSecond, () => this.productos);
     print(response);
     // compute function to run parsePosts in a separate isolate
@@ -72,11 +93,13 @@ class FirstFragmentState extends State<FirstFragment> {
           child: new Card(
             elevation: 5.0,
             child: new Hero(
-              tag: this.productos[index].descripcion,
+              tag: this.productos[index].idproductos.toString() + 'tag',
               child: new Stack(
                 alignment: Alignment.centerLeft,
                 children: <Widget>[
-                  Image.asset("assets/images/demou.jpg", fit: BoxFit.fitWidth),
+                  this.productos[index].imageTipe == 0
+                      ? new Image.asset(this.productos[index].image, fit: BoxFit.cover)
+                      : new Image.memory(this.productos[index].getImage(), fit: BoxFit.cover),
                   this.productos[index].isSelect
                       ? new Positioned(
                       top: 0,
@@ -97,7 +120,7 @@ class FirstFragmentState extends State<FirstFragment> {
                           color: Colors.transparent,
                         ),
                         padding: EdgeInsets.symmetric(horizontal: 2.0),
-                        child: valueWidget(this.goDetalleId != index ? this.productos[index].descripcion : ''),
+                        child: valueWidget(this.goDetalleId != index ? this.productos[index].nombre : ''),
                       )),
                   new Positioned.fill(
                       child: new Material(
@@ -110,12 +133,9 @@ class FirstFragmentState extends State<FirstFragment> {
                               if (this.countDeleteElements() > 0) {
                                 this.markElement(index);
                               } else {
-                                setState(() => this.goDetalleId  = index);
+                                this.goDetalleId  = index;
                                 final result = await Navigator.of(context).push(new MaterialPageRoute(
-                                  builder: (BuildContext context) => new Detail(
-                                    nama: this.productos[index].descripcion,
-                                    gambar: 'assets/images/demou.jpg',
-                                  ),
+                                  builder: (BuildContext context) => new Detail(this.productos[index]),
                                 ));
                                 const ms = const Duration(milliseconds: 30);
 
@@ -164,7 +184,16 @@ class FirstFragmentState extends State<FirstFragment> {
         alignment: Alignment.centerLeft,
         children: <Widget>[
           IconButton(
-            onPressed: () {},
+            onPressed: () async {
+              print(this.deleteElements);
+              this.deleteElements.forEach((index) async {
+                var result1 = await this.db.delete(this.db.tableProductPrecio, this.productos[index].idproductos, this.db.productosidproductos);
+                var result = await this.db.delete(this.db.tableProductos, this.productos[index].idproductos, this.db.idproductos);
+                this.productos.removeAt(index);
+              });
+              setState(() {});
+              this.homePageState.setActions(<Widget>[]);
+            },
             icon: Icon(Icons.delete, color: Colors.redAccent),
             tooltip: 'Eliminar',
           ),
@@ -231,185 +260,6 @@ class FirstFragmentState extends State<FirstFragment> {
   BoxDecoration badgeDecoration() {
     return new BoxDecoration(
       color: Colors.black.withOpacity(0.5),
-    );
-  }
-}
-
-
-class Detail extends StatelessWidget {
-  Detail({this.nama, this.gambar});
-  final String nama;
-  final String gambar;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return new Scaffold(
-      appBar: new AppBar(
-        // here we display the title corresponding to the fragment
-        // you can instead choose to have a static title
-          title: new Text('Detalles del producto'),
-          actions: <Widget> [
-            FlatButton(
-                child: Text('SAVE', style: theme.textTheme.body1.copyWith(color: Colors.white)),
-                onPressed: () {
-                  Navigator.pop(context, 'save');
-                }
-            )
-          ]
-      ),
-      body: new ListView(
-        children: <Widget>[
-          new Container(
-              height: 240.0,
-              child: new Hero(
-                tag: nama,
-                child: new Material(
-                  child: new InkWell(
-                    child: new Image.asset(
-                      "$gambar",
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-              )),
-          new FormWidget(
-            nama: nama,
-          ),
-          new BagianIcon(),
-          new Keterangan(),
-        ],
-      ),
-    );
-  }
-}
-
-class FormWidget extends StatelessWidget {
-  FormWidget({this.nama});
-  final String nama;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Form(
-        onWillPop: () {},
-        child: Column(
-            children: <Widget>[
-              Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  alignment: Alignment.bottomLeft,
-                  child: TextField(
-                      decoration: const InputDecoration(
-                          labelText: 'Event name',
-                          filled: true
-                      ),
-                      style: theme.textTheme.headline,
-                      onChanged: (String value) {
-                        // TODO: cambiar nombre del toolbar
-                        /*setState(() {
-                          _hasName = value.isNotEmpty;
-                          if (_hasName) {
-                            _eventName = value;
-                          }
-                        });*/
-                      }
-                  )
-              ),
-              Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  alignment: Alignment.bottomLeft,
-                  child: TextField(
-                      decoration: const InputDecoration(
-                          labelText: 'Location',
-                          hintText: 'Where is the event?',
-                          filled: true
-                      ),
-                      // TODO para ver si cambio un valor
-                      /*onChanged: (String value) {
-                        setState(() {
-                          _hasLocation = value.isNotEmpty;
-                        });
-                      }*/
-                  )
-              ),
-            ]
-                .map<Widget>((Widget child) {
-              return Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  height: 96.0,
-                  child: child
-              );
-            })
-                .toList()
-        )
-    );
-  }
-}
-
-class BagianIcon extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return new Container(
-      padding: new EdgeInsets.all(10.0),
-      child: new Row(
-        children: <Widget>[
-          new Iconteks(
-            icon: Icons.call,
-            teks: "Call",
-          ),
-          new Iconteks(
-            icon: Icons.message,
-            teks: "Message",
-          ),
-          new Iconteks(
-            icon: Icons.photo,
-            teks: "Photo",
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class Iconteks extends StatelessWidget {
-  Iconteks({this.icon, this.teks});
-  final IconData icon;
-  final String teks;
-  @override
-  Widget build(BuildContext context) {
-    return new Expanded(
-      child: new Column(
-        children: <Widget>[
-          new Icon(
-            icon,
-            size: 50.0,
-            color: Colors.blue,
-          ),
-          new Text(
-            teks,
-            style: new TextStyle(fontSize: 18.0, color: Colors.blue),
-          )
-        ],
-      ),
-    );
-  }
-}
-
-class Keterangan extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return new Container(
-      padding: new EdgeInsets.all(10.0),
-      child: new Card(
-        child: new Padding(
-          padding: const EdgeInsets.all(10.0),
-          child: new Text(
-            "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.",
-            style: new TextStyle(fontSize: 18.0),
-            textAlign: TextAlign.justify,
-          ),
-        ),
-      ),
     );
   }
 }
